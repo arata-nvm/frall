@@ -15,15 +15,19 @@ fn main() {
         io::stdin()
             .read_line(&mut line)
             .expect("failed to read stdin");
-        let command = line.trim();
+        let tokens: Vec<&str> = line.trim().split(" ").collect();
 
         match unsafe { unistd::fork() } {
             Ok(unistd::ForkResult::Parent { child }) => {
                 wait::waitpid(child, None).expect("failed to waitpid");
             }
             Ok(unistd::ForkResult::Child) => {
-                let command_cstr = ffi::CString::new(command).expect("failed to CString::new");
-                unistd::execvp(&command_cstr, &[command_cstr.clone()]).expect("failed to execvp");
+                let tokens_cstr: Vec<ffi::CString> = tokens
+                    .into_iter()
+                    .map(|token| ffi::CString::new(token))
+                    .collect::<Result<Vec<ffi::CString>, ffi::NulError>>()
+                    .expect("failed to CString::new");
+                unistd::execvp(&tokens_cstr[0], &tokens_cstr).expect("failed to execvp");
             }
             Err(e) => panic!("failed to fork: {e}"),
         }
